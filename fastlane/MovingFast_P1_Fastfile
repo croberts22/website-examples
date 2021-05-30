@@ -1,0 +1,69 @@
+# Customise this file, documentation can be found here:
+# https://github.com/fastlane/fastlane/tree/master/docs
+# All available actions: https://github.com/fastlane/fastlane/blob/master/fastlane/docs/Actions.md
+# can also be listed using the `fastlane actions` command
+
+# This is the minimum version number required.
+# Update this, if you use features of a newer version
+fastlane_version '2.30.0'
+
+default_platform :ios
+
+platform :ios do
+  before_all do
+    # Add useful, non-secure environment variables here.
+    ENV['TARGET_NAME'] = 'MyAniList'
+    ENV['BETA_TARGET_NAME'] = 'MyAniList-Beta'
+    ENV['XCODE_PATH'] = 'MyAniList.xcodeproj'
+  end
+
+  desc 'Submit a new external beta to TestFlight.'
+  lane :beta do |options|
+    skip_build = options[:skip_build] ? true : false
+    create_beta unless skip_build
+    submit_beta
+    publish_beta
+  end
+
+  desc 'Submits a new beta to the "Internal" group to TestFlight.'
+  lane :internal_beta do
+      beta(group: "Internal")
+  end
+
+  desc 'Submits a new beta to the "External" group to TestFlight.'
+  lane :external_beta do
+      beta(group: "External")
+  end
+
+  desc 'Submits a new beta to TestFlight.'
+  desc '- Parameter `group`: Defines the TestFlight group the beta should be distributed to.`
+  private_lane :beta do |options|
+    if is_ci? == false
+      ensure_git_status_clean
+      reset_git_repo
+    end
+
+    match
+    update_build_number
+    gym(scheme: ENV['BETA_TARGET_NAME'])
+    pilot(groups: options[:group])
+  end
+
+  lane :update_build_number do
+    build_number = latest_testflight_build_number(
+      version: get_version_number(xcodeproj: ENV['XCODE_PATH'], target: ENV['TARGET_NAME']).to_s,
+      initial_build_number: get_build_number(xcodeproj: ENV['XCODE_PATH'])
+    )
+
+    increment_build_number(
+      build_number: build_number.to_i + 1,
+      xcodeproj: ENV['XCODE_PATH']
+    )
+  end
+end
+
+# More information about multiple platforms in fastlane: https://github.com/fastlane/fastlane/blob/master/docs/Platforms.md
+# All available actions: https://github.com/fastlane/fastlane/blob/master/fastlane/docs/Actions.md
+
+# fastlane reports which actions are used
+# No personal data is recorded. Learn more at https://github.com/fastlane/enhancer
